@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto del Proyecto Gungry
 
-Documento actualizado el 30 de abril de 2026 para continuar el trabajo de reactivación de la app Gungry.
+Documento generado el 30 de abril de 2026 para continuar el trabajo de reactivación de la app Gungry.
 
 ---
 
@@ -62,8 +62,6 @@ Las credenciales reales se encuentran en **Railway → proyecto gungry-backend �
 | `Dockerfile` | Node 18 slim, variables de entorno Cloudinary |
 | `.env.example` | Documentación de variables |
 | `package.json` | Dependencias actualizadas |
-| `scripts/set-admin-type.js` | Script: encuentra el usuario 'admin' y le asigna `type: 'admin'` |
-| `scripts/set-admin-permissions.js` | Script: asigna `type: 'admin'` y el array completo de 13 permissions al usuario admin |
 
 ### manager-gungry (Admin Portal)
 
@@ -76,27 +74,20 @@ Las credenciales reales se encuentran en **Railway → proyecto gungry-backend �
 | `src/app/modules/admin/post/list/list.component.html` | `imageThumb._url` → `image?._url` |
 | `src/app/modules/admin/slide-intro/list/list.component.html` | `imageThumb._url` → `image?._url` |
 | `src/app/modules/admin/notification/list/list.component.html` | `imageThumb._url` → `image?._url` |
-| `src/app/services/category.service.ts` | Búsqueda por OR query: busca en `canonical` (lowercase) y en `title` simultáneamente usando `Parse.Query.or()` |
-| `src/assets/i18n/en.json` | Agregada clave `"SLIDER_IMAGES": "Slider Images"` |
-| `src/assets/i18n/es.json` | Agregada clave `"SLIDER_IMAGES": "Banners"` |
 
 ### gungry-app (App Móvil)
 
 | Archivo | Cambios |
 |---|---|
 | `src/environments/environment.prod.ts` | `appId: 'gungry-app'`, `serverURL` apuntando a Railway |
-| `.browserslistrc` | `Safari >= 14`, `iOS >= 14` |
+| `.browserslistrc` | `Safari >= 14`, `iOS >= 14` (en lugar de "last 2 major versions" que incluía versiones con formato inválido `18.5-18.7`) |
 | `netlify.toml` | `npm install && ng build --configuration production`, SPA redirects `/* → /index.html` |
 | `package.json` | `@angular-devkit/build-angular: ~13.3.11`, `ngx-bar-rating: ^3.0.0`, `overrides: { esbuild: "0.14.54" }` |
 | `tsconfig.json` | `skipLibCheck: true` |
-| `src/global.scss` | Comentado `@import "~ngx-bar-rating/themes/br-stars-theme"` |
+| `src/global.scss` | Comentado `@import "~ngx-bar-rating/themes/br-stars-theme"` (ruta cambia en v3) |
 | `src/app/app.component.ts` | Import de `onesignal-cordova-plugin/types/Notification` comentado, reemplazado con `any` |
 | `src/types.d.ts` | Nuevo — declare module para `NotificationReceivedEvent` y `OpenedEvent` |
 | `src/app/pages/map/map.ts` | `buttonClose` → `bottomClose`, fallback a coordenadas de Guadalajara cuando no hay geolocalización |
-| `src/app/components/info-window/info-window.html` | Imagen: `place.imageThumb.url()` → `place.image?._url`; Categorías: `*ngIf="false"` (categorías son punteros sin `.join()`) |
-| `src/app/components/place-card/place-card.component.ts` | Agregado `@Input() routerLink: any[]` |
-| `src/app/components/place-card/place-card.component.html` | `[routerLink]="routerLink"` movido al `<ion-card>` interno (no al host) |
-| `src/app/pages/favorite-list/favorite-list.html` | `routerLink` cambiado a ruta absoluta `['/1/home/places/' + place.id]` |
 
 ---
 
@@ -111,7 +102,7 @@ const { GridFSBucketAdapter } = require('parse-server/lib/Adapters/Files/GridFSB
 ```
 
 ### Cloud Functions vs Queries Directas
-La app móvil usa Cloud Functions para casi todo. El Admin Portal usa una mezcla: queries directas para Category, SliderImage, Post, y Cloud Functions para Place, Review, UserPackage, y operaciones CRUD de usuarios.
+La app móvil usa Cloud Functions para casi todo. El Admin Portal usa una mezcla: queries directas para Category, SliderImage, Post, y Cloud Functions para Place, Review, UserPackage.
 
 ### Serialización de Datos (CRÍTICO)
 Este es el punto más delicado del proyecto. Hay dos tipos de respuesta:
@@ -123,12 +114,10 @@ Este es el punto más delicado del proyecto. Hay dos tipos de respuesta:
 | Componente | Tipo de objeto esperado |
 |---|---|
 | App móvil — home (categories, slides) | Parse Objects nativos (sin toJSON) |
-| App móvil — map (places, info-window) | JSON plano (con toJSON) — `place.image?._url` |
+| App móvil — map (places) | JSON plano (con toJSON) |
 | App móvil — place service load() | Array directo (sin wrapper `{results, total}`) |
 | Manager — listados de categorías, places, etc. | JSON plano (con toJSON), pero necesita `id` explícito |
-| Manager — getUsers | Parse Objects **nativos** (sin toJSON) — ParseUser usa `this.get('name')` |
-
-**Por qué `getUsers` devuelve objetos nativos:** La clase `ParseUser` en el manager extiende `Parse.User` y usa getters como `this.get('name')`, `this.get('type')`, `this.get('permissions')`. Esos getters solo funcionan con instancias Parse nativas, no con objetos planos producto de `.toJSON()`. Si se aplica `.toJSON()`, todos los campos aparecen `undefined`.
+| Manager — getUsers | JSON plano con `id: u.id` agregado manualmente |
 
 ### Soft Delete
 El manager usa soft delete en todos los modelos — NO llama a `.destroy()`, sino que guarda `deletedAt: new Date`. Por eso todas las queries del backend deben incluir:
@@ -142,12 +131,6 @@ Los registros en la BD tienen `status: "Active"` (con mayúscula A), no `"active
 query.matches('status', /^active$/i);
 ```
 
-### Patrón routerLink en Componentes Ionic
-`ion-card button` intercepta los clicks internamente y **no propaga** el evento al host. Por eso:
-- **NO** poner `[routerLink]` en el host `<app-place-card>` — nunca se dispara.
-- **SÍ** poner `[routerLink]` dentro del `<ion-card>` en el template del componente.
-- Para hacerlo configurable desde el padre, agregar `@Input() routerLink: any[]` al componente y bindear `[routerLink]="routerLink"` en el `<ion-card>` interno.
-
 ---
 
 ## 5. Cloud Functions en cloud/main.js
@@ -155,22 +138,19 @@ query.matches('status', /^active$/i);
 | Función | Descripción | Notas |
 |---|---|---|
 | `getAppConfig` | Devuelve `{}` | App lo llama al iniciar |
-| `getUsers` | Query a `_User`, devuelve `{ users, total }`. Soporta filtro `type`: `customer` (incluye sin type), `admin` (type admin/super_admin), o sin filtro para todos | Sin toJSON — objetos nativos. OR query para customer: `type='customer'` OR doesNotExist('type') |
-| `getUser` | Obtiene un `_User` por `id` | useMasterKey, devuelve objeto nativo |
-| `createUser` | Crea un usuario nuevo con `user.save(null, { useMasterKey })` | Acepta: name, username, email, password, permissions, type |
-| `updateUser` | Actualiza campos de un `_User` por `objectId` | Solo actualiza campos presentes en params; usa `user.save(null, { useMasterKey })` |
-| `destroyUser` | Soft delete: `user.set('deletedAt', new Date())` | No llama a `.destroy()` |
-| `getCollectionsCount` | Counts de 7 colecciones: Category, Place, Post, _User, Review, Notification, SliderImage | Para dashboard del manager |
-| `getPlaces` | Query a `Place`, devuelve array directo | Sin wrapper, con toJSON — `place.image?._url` en cliente |
+| `getUsers` | Query a `_User`, devuelve `{ users, total }` | Mapear con `id: u.id` |
+| `getCollectionsCount` | Counts de Category, Place, Post | Para dashboard del manager |
+| `getPlaces` | Query a `Place`, devuelve array directo | Sin wrapper, con toJSON |
 | `getPlacesWithUser` | Query a `Place` con include user | Para manager, sin toJSON |
 | `getPlaceWithUser` | Un Place por objectId con include user | Para manager, sin toJSON |
 | `getReviewsWithUser` | Query a `Review` con include user y place | Para manager |
 | `getReviewWithUser` | Un Review por objectId | Para manager |
 | `getUserPackagesWithUser` | Query a `UserPackage` con include user y package | Para manager |
-| `getCollections` | Counts de varias clases | Para manager dashboard (función legacy) |
-| `getHomePageData` | Devuelve `{ newPlaces, featuredPlaces, nearbyPlaces, categories, slides }`. newPlaces y featuredPlaces incluyen `query.include('categories')` | Sin toJSON — objetos nativos |
+| `getCollections` | Counts de varias clases | Para manager dashboard |
+| `getHomePageData` | Devuelve `{ newPlaces, featuredPlaces, nearbyPlaces, categories, slides }` | Sin toJSON — objetos nativos |
+| `getPlacesWithUser` | Places con usuario para manager | Sin toJSON |
 | `loginInCloud` | Parse.User.logIn(username, password) | Para login en app móvil |
-| `signUpInCloud` | Crea usuario nuevo con signUp(). Asigna `type: 'customer'` antes de sign up | Para registro en app móvil |
+| `signUpInCloud` | Crea usuario nuevo con signUp() | Para registro en app móvil |
 
 ---
 
@@ -213,7 +193,7 @@ res.header('Cross-Origin-Resource-Policy', 'cross-origin');
 
 2. **Categorías no aparecen en home (sección principal)** — Las categorías aparecen al hacer "Ver más" pero no en el grid del home. El backend devuelve `categories: []` cuando usa filtro por status. Resuelto parcialmente con regex case-insensitive, pero puede seguir fallando si hay registros con `deletedAt`.
 
-3. ~~**Lista de usuarios en Manager en blanco**~~ — **RESUELTO**. Causa: `getUsers` aplicaba `.toJSON()` y `ParseUser` usa `this.get()` que solo funciona con objetos nativos. Fix: eliminar `.toJSON()` y devolver `results` directamente.
+3. **Lista de usuarios en Manager en blanco** — `getUsers` devuelve `{ users, total }` correctamente pero el manager puede estar teniendo problemas para mapear los datos. Investigar `parse-user.service.ts` — cómo procesa la respuesta.
 
 4. **Login en app móvil** — `loginInCloud` existe pero aún devuelve 400 en algunos casos. Verificar que Railway ya tenga el último deploy con esa función.
 
@@ -229,9 +209,7 @@ res.header('Cross-Origin-Resource-Policy', 'cross-origin');
 
 - **NO agregar `.toJSON()` a `getHomePageData`**. La app móvil necesita Parse Objects nativos para acceder a `category.image?.url()` y `category.id`.
 
-- **NO agregar `.toJSON()` a `getUsers`**. El manager usa la clase `ParseUser` con getters `this.get('name')` etc. que solo funcionan con objetos nativos.
-
-- **NO quitar `.toJSON()` de `getPlaces`**. El mapa accede a `place.location.latitude` directamente como JSON plano, y `info-window.html` usa `place.image?._url`.
+- **NO quitar `.toJSON()` de `getPlaces`**. El mapa accede a `place.location.latitude` directamente como JSON plano.
 
 - **NO cambiar el import de GridFSBucketAdapter**. El import correcto es desde la ruta interna:
   ```javascript
@@ -241,8 +219,6 @@ res.header('Cross-Origin-Resource-Policy', 'cross-origin');
 - **NO tocar los registros DNS de Netlify** para `manager.gungry.com` o `app.gungry.com` sin entender que están gestionados desde el panel DNS de la organización Gungry en Netlify, no desde Hostinger.
 
 - **NO usar `npm ci`** en el `netlify.toml` de gungry-app. El `package-lock.json` fue generado en Windows y causa problemas en Linux. Usar `npm install`.
-
-- **NO poner `[routerLink]` en el host `<app-place-card>`**. `ion-card button` intercepta los clicks — el routerLink en el host nunca se dispara. Siempre poner `[routerLink]` dentro del `<ion-card>` en el template del componente, usando `@Input() routerLink: any[]`.
 
 ---
 
@@ -261,88 +237,15 @@ res.header('Cross-Origin-Resource-Policy', 'cross-origin');
 | Clase | Campos Clave |
 |---|---|
 | `Place` | title, description, address, location (GeoPoint), image, images[], categories[], status, isFeatured, priceRange, user, deletedAt |
-| `Category` | title, image, status, order, isFeatured, deletedAt, canonical |
+| `Category` | title, image, status, order, isFeatured, deletedAt |
 | `SliderImage` | description, image, isActive, sort, position, type, place, post, category, url |
 | `Post` | title, image, place, status, deletedAt |
 | `Review` | rating, comment, place, user |
 | `UserPackage` | user, package, status |
 | `SlideIntro` | image, title, description |
 | `Notification` | title, message, image |
-| `_User` | name, username, email, photo, authData, **type** (`'admin'` / `'super_admin'` / `'customer'`), **permissions** (array de strings) |
+| `_User` | name, username, email, photo, authData |
 
-**Soft Delete:** `Place`, `Category`, `Post`, `_User` (destroyUser) usan `deletedAt` para borrado lógico. Siempre filtrar con `query.doesNotExist('deletedAt')`.
+**Soft Delete:** `Place`, `Category`, `Post` usan `deletedAt` para borrado lógico. Siempre filtrar con `query.doesNotExist('deletedAt')`.
 
 **Status values:** `"Active"` / `"Inactive"` (con mayúscula). Para places: `"Approved"` / `"Pending"`.
-
-**Tipos de usuario (`_User.type`):**
-- `'super_admin'` — acceso total, bypasea AuthGuard
-- `'admin'` — acceso según array `permissions`
-- `'customer'` — usuario de la app móvil (asignado automáticamente en `signUpInCloud`)
-- Sin `type` — también tratado como `customer` en `getUsers`
-
----
-
-## 12. Sistema de Autenticación y Permisos (Manager)
-
-### AuthGuard
-El guard verifica `user.type` y `user.permissions`:
-- `super_admin` — bypass total, accede a todo.
-- `admin` — accede solo a los módulos cuyo ID esté en `user.permissions`.
-- Otros — redirige a login o página no autorizada.
-
-### IDs de módulos en `permissions`
-Los IDs corresponden a las entradas en `defaultNavigation` del manager:
-
-| ID | Módulo |
-|---|---|
-| `users` | Cuentas admin |
-| `customers` | Usuarios (clientes de la app) |
-| `categories` | Categorías |
-| `places` | Promos / Lugares |
-| `posts` | Noticias |
-| `reviews` | Reseñas |
-| `pages` | Páginas |
-| `slide_images` | Banners |
-| `slides` | Guía de inicio |
-| `packages` | Paquetes |
-| `user_packages` | Membresías |
-| `notifications` | Notificaciones |
-| `config` | Configuración de app |
-
-### Dashboard (getCollectionsCount)
-El dashboard usa la clave `count.key | uppercase` pipe para traducción. La función `getCollectionsCount` debe devolver exactamente estas claves: `categories`, `places`, `posts`, `users`, `reviews`, `notifications`, `slider_images` (con guión bajo, no camelCase). Las claves i18n correspondientes son `CATEGORIES`, `PLACES`, `POSTS`, `USERS`, `REVIEWS`, `NOTIFICATIONS`, `SLIDER_IMAGES`.
-
----
-
-## 13. Estructura de Rutas (App Móvil)
-
-La app usa tabs bajo el prefijo `/1/`:
-
-| Ruta | Descripción |
-|---|---|
-| `/1/home` | Home principal |
-| `/1/home/places/:id` | Detalle de un lugar (desde home) |
-| `/1/map` | Mapa |
-| `/1/likes` | Favoritos (tab directo) |
-| `/1/profile` | Perfil |
-| `/1/profile/likes` | Favoritos (desde perfil) |
-
-**IMPORTANTE:** Al navegar desde favoritos a detalle de lugar, usar ruta **absoluta** `/1/home/places/:id`. Las rutas relativas `../places/:id` resuelven a `/1/places/:id` o `/1/profile/places/:id` que no existen.
-
----
-
-## 14. Scripts de Utilidad (gungry-backend/scripts/)
-
-Todos los scripts usan un parser manual de `.env` (no requieren `dotenv` instalado) y el `fetch` nativo de Node 18.
-
-| Script | Descripción | Uso |
-|---|---|---|
-| `set-admin-type.js` | Encuentra usuario 'admin' y asigna `type: 'admin'` | `node scripts/set-admin-type.js` |
-| `set-admin-permissions.js` | Asigna `type: 'admin'` y el array completo de 13 permissions al usuario 'admin' | `node scripts/set-admin-permissions.js` |
-
-**Prerequisito:** Crear `gungry-backend/.env` (gitignored) con:
-```
-PUBLIC_SERVER_URL=https://gungry-backend-production.up.railway.app/api/1
-APP_ID=gungry-app
-MASTER_KEY=<MASTER_KEY de Railway>
-```
