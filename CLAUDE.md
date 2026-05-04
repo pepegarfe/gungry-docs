@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto completo del proyecto Antike
 
-> **Propósito de este archivo:** Transferencia de contexto para que una IA (u otro desarrollador) pueda continuar el trabajo sin perder ninguna decisión tomada, patrón acordado ni advertencia crítica. Actualizado el 30 de abril de 2026.
+> **Propósito de este archivo:** Transferencia de contexto para que una IA (u otro desarrollador) pueda continuar el trabajo sin perder ninguna decisión tomada, patrón acordado ni advertencia crítica. Actualizado el 3 de mayo de 2026.
 
 ---
 
@@ -26,7 +26,7 @@ El sistema tiene tres roles con acceso diferenciado:
 |---|---|---|
 | `admin` | Todo: cotizador, historial, tarifas, solicitudes de clientes | Email/contraseña o Google |
 | `vendedor` | Cotizador + historial (no tarifas, no solicitudes) | Email/contraseña o Google |
-| cliente externo | Solo formulario público `/solicitar` | Sin cuenta — solo nombre, empresa, email y tel |
+| cliente externo | Solo formulario público `/cotizar` | Sin cuenta — solo nombre, empresa, email y tel |
 
 El rol se almacena en `public.users.rol`. Para promover a alguien a admin:
 ```sql
@@ -67,7 +67,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 | Archivo | Propósito |
 |---|---|
 | `src/lib/supabase.js` | **Archivo más crítico del frontend.** Cliente Supabase único + todos los helpers de DB por dominio: `auth`, `clientesDB`, `cotizacionesDB`, `partidasDB`, `tarifasDB`, `pdfDB`, `solicitudesDB`, `usuariosDB`. Toda operación de DB pasa por aquí. `clientesDB.listar()` y `cotizacionesDB.listar()` enriquecen cada registro con el campo `creador` (nombre + email del usuario que lo creó), usando una segunda query a `public.users`. |
-| `src/lib/calculos.js` | Motor de cálculo central. Funciones: `calcArea()`, `calcPerimetro()`, `calcPeso()`, `calcularPartida()`, `validarPartida()`, `dibujarMiniatura()`, `calcularRejas()`. **Este módulo es la única fuente de verdad para precios** — lo usan tanto el frontend como `api/pdf.py`. |
+| `src/lib/calculos.js` | Motor de cálculo central. Funciones: `calcArea()`, `calcPerimetro()`, `calcPeso()`, `calcularPartida()`, `validarPartida()`, `dibujarMiniatura()`, `calcularRejas()`. También exporta `TARIFAS_DEFAULT` — el objeto de tarifas canónico usado como fallback en `useTarifas()` y en `Solicitar.jsx`. **Este módulo es la única fuente de verdad para precios** — lo usan tanto el frontend como `api/pdf.py`. |
 
 ### `src/hooks/`
 
@@ -90,7 +90,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 | `src/pages/CotizacionDetalle.jsx` | Vista de solo lectura de una cotización guardada. Partidas mostradas en layout de filas (`pd-*`). Admin ve botón "Ver lógica matemática" por partida (usa `MathBreakdown`). |
 | `src/pages/Historial.jsx` | Layout de dos columnas: sidebar oscuro con clientes + timeline de versiones. CRUD completo de clientes. Admin ve todas las cotizaciones de todos los usuarios; cada tarjeta muestra creador y fecha de creación. Vendedor solo ve las suyas. |
 | `src/pages/Tarifas.jsx` | Motor de tarifas editable con 7 pestañas. Solo accesible para admin. Al guardar versiona (no sobreescribe). |
-| `src/pages/Solicitar.jsx` | **Formulario público para clientes externos** (sin autenticación). El cliente ingresa datos de contacto y configura sus productos. **No muestra precios** — los precios solo llegan cuando el admin manda la cotización. Usa TARIFAS hardcodeadas internamente para calcular el total al guardar en `solicitudes`. Ruta: `/solicitar`. |
+| `src/pages/Solicitar.jsx` | **Formulario público para clientes externos** (sin autenticación). El cliente ingresa datos de contacto y configura sus productos. **No muestra precios** — los precios solo llegan cuando el admin manda la cotización. Importa `TARIFAS_DEFAULT` de `calculos.js` para calcular el total al guardar en `solicitudes`. Ruta: `/cotizar`. |
 | `src/pages/Solicitudes.jsx` | **Vista admin de solicitudes de clientes.** Sidebar con lista + filtros por estado (pendiente/enviada/convertida). Panel de detalle con miniatura canvas por producto y botón "Ver lógica matemática" (usa `MathBreakdown`). Solo accesible para admin. Ruta: `/solicitudes`. |
 | `src/pages/Usuarios.jsx` | **Gestión de usuarios (solo admin).** Formulario para crear nuevas cuentas de vendedor (llama a `api/crear-usuario.js`). Tabla de usuarios existentes con selector de rol. Ruta: `/usuarios`. |
 
@@ -98,7 +98,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 
 | Archivo | Propósito |
 |---|---|
-| `src/App.jsx` | Router con React Router 6. Componente `Privado` con guard de auth + guard de rol (`soloAdmin`). Nav lateral: links principales (cotizar, historial, solicitudes) + submenú de configuración ⚙ en el footer (Tarifas y Usuarios, solo admin). Rutas lazy con `Suspense`. `/solicitar` es pública (sin `Privado`). Rutas admin-only: `/tarifas`, `/solicitudes`, `/usuarios`. |
+| `src/App.jsx` | Router con React Router 6. Componente `Privado` con guard de auth + guard de rol (`soloAdmin`). Nav lateral: links principales (nueva-cotizacion, historial, solicitudes) + submenú de configuración ⚙ en el footer (Tarifas y Usuarios, solo admin). Rutas lazy con `Suspense`. `/cotizar` es pública (sin `Privado`). Rutas privadas del cotizador: `/nueva-cotizacion` y `/nueva-cotizacion/:id`. Rutas admin-only: `/tarifas`, `/solicitudes`, `/usuarios`. |
 | `src/main.jsx` | Punto de entrada React. Monta `<App />` en `#root`. Importa `global.css`. |
 | `src/styles/global.css` | **Todos los estilos en un solo archivo.** Variables CSS, dark mode, DM Sans + DM Mono. Incluye clases `.sol-*` (formulario público), `.sq-*` (vista solicitudes admin), `.math-breakdown` / `.mb-*` (desglose matemático), `.pd-*` (cards de partida en filas), `.usu-*` (gestión de usuarios), `.nav-config-*` (submenú de configuración). Toasts usan `background: #1e1e1c` (hardcoded) para no romper en dark mode. |
 
@@ -146,9 +146,13 @@ El folio (`COT-2025-XXXX`) lo genera la función PostgreSQL `siguiente_folio(use
 
 El desglose matemático de cada partida vive en `src/components/MathBreakdown.jsx` y se importa tanto en `CotizacionDetalle` como en `Solicitudes`. También exporta `mxn()` y `dec()` para que los archivos que lo importan no necesiten redefinirlos.
 
-### Decisión: TARIFAS hardcodeadas en Solicitar.jsx
+### Decisión: TARIFAS_DEFAULT en calculos.js como única fuente de valores por defecto
 
-El formulario público no tiene acceso autenticado a Supabase, por lo que usa un objeto `TARIFAS` local con los valores por defecto. El total se calcula internamente para guardarse en la DB, pero **no se muestra al cliente** — los precios solo se comunican cuando el admin manda la cotización. El admin puede ver el desglose real usando las tarifas activas de DB.
+`calculos.js` exporta `TARIFAS_DEFAULT`, el objeto canónico de tarifas iniciales. Lo usan:
+- `Solicitar.jsx` (formulario público) — no tiene acceso autenticado a Supabase, así que usa `TARIFAS_DEFAULT` como constante local. El total se calcula internamente para guardarse en la DB, pero **no se muestra al cliente** — los precios solo se comunican cuando el admin manda la cotización.
+- `useTarifas()` — si `tarifasDB.obtenerActivas()` devuelve `null` (sin fila activa en DB) o lanza error, el hook cae a `TARIFAS_DEFAULT` en lugar de quedarse en `loading: true`.
+
+Si los precios base cambian, actualizar **solo** `TARIFAS_DEFAULT` en `calculos.js`.
 
 ### Decisión: creación de cuentas vía función serverless (no `signUp` en cliente)
 
@@ -192,7 +196,8 @@ function Privado({ children, soloAdmin = false }) {
 ```
 
 Rutas admin-only: `/tarifas`, `/solicitudes`, `/usuarios`.  
-Ruta pública (sin Privado): `/solicitar`.
+Ruta pública (sin Privado): `/cotizar` (formulario de clientes externos).  
+Rutas del cotizador interno: `/nueva-cotizacion` y `/nueva-cotizacion/:id`.
 
 ### Row Level Security (RLS)
 
@@ -385,24 +390,25 @@ CREATE POLICY "admin update rol"
 ### Flujo interno (admin/vendedor)
 
 ```
-Usuario abre /cotizar
+Usuario abre /nueva-cotizacion
   → useClientes() carga lista de clientes desde Supabase
   → useTarifas() carga tarifas activas (JSON) desde Supabase
+      (si no hay fila activa o error → usa TARIFAS_DEFAULT de calculos.js)
   → FormPartida usa calculos.js para precio en tiempo real (sin red)
   → "Agregar partida" → estado local (array de partidas)
   → "Guardar cotización":
       1. cotizacionesDB.crear() → INSERT en cotizaciones
          (folio generado por siguiente_folio() en PostgreSQL)
       2. partidasDB.actualizarLote() → DELETE + INSERT de partidas
-      3. navigate('/cotizar/:id')
+      3. navigate('/nueva-cotizacion/:id')
 ```
 
 ### Flujo de solicitudes de clientes externos
 
 ```
-Cliente abre /solicitar (público, sin auth)
+Cliente abre /cotizar (público, sin auth)
   → Ingresa datos de contacto (nombre, empresa, email, tel)
-  → Configura productos con TARIFAS hardcodeadas en Solicitar.jsx
+  → Configura productos con TARIFAS_DEFAULT (de calculos.js) en Solicitar.jsx
   → Ve precio estimado en tiempo real (canvas preview incluido)
   → "Enviar solicitud":
       solicitudesDB.crear() → INSERT en solicitudes (rol anon, sin SELECT)
@@ -517,7 +523,7 @@ CREATE POLICY "admin update rol" ON public.users FOR UPDATE TO authenticated
 | Funcionalidad | Prioridad | Notas |
 |---|---|---|
 | Envío de email al recibir solicitud de cliente | Alta | Usar Resend o SendGrid desde una function de Vercel |
-| "Convertir solicitud en cotización" | Alta | Botón en `/solicitudes` que pre-rellena `/cotizar` con los datos de la solicitud |
+| "Convertir solicitud en cotización" | Alta | Botón en `/solicitudes` que pre-rellena `/nueva-cotizacion` con los datos de la solicitud |
 | Deploy a Vercel con variables de entorno | Alta | Configurar VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY y SUPABASE_SERVICE_KEY |
 | Rollback optimista en hooks | Media | Si Supabase falla, revertir estado local |
 | Tests unitarios de `calculos.js` | Media | Especialmente las fórmulas de precio |
@@ -574,7 +580,7 @@ python generar_cotizacion.py   # genera cotizacion_antike.pdf de demo
 
 4. **Dominio** — El README asume `cotizador.antike.mx`. Si es diferente, actualizar en Vercel Dashboard y en Supabase Auth → URL Configuration → Site URL.
 
-5. **Tarifas del formulario público** — En `Solicitar.jsx` hay un objeto `TARIFAS` hardcodeado con los valores por defecto. Si los precios cambian en el motor de tarifas, actualizar también este objeto manualmente (o futuramente cargar las tarifas públicas de otra forma).
+5. **Tarifas del formulario público** — `Solicitar.jsx` importa `TARIFAS_DEFAULT` de `calculos.js`. Si los precios base cambian, actualizar únicamente `TARIFAS_DEFAULT` en `calculos.js`; `Solicitar.jsx` lo refleja automáticamente.
 
 6. **Email de confirmación al cliente** — Definir qué plataforma usar (Resend recomendado por su integración con Vercel) y qué información incluir en el correo.
 
@@ -635,6 +641,14 @@ reportlab  (pip install reportlab --break-system-packages)
 9. Corrección: `cotizacionesDB.crear()` incluía `user_id` faltante en el INSERT (mismo bug que `clientesDB.crear()` en sesión 2)
 10. Corrección: toasts invisibles en dark mode — `background: var(--ink)` reemplazado por `background: #1e1e1c`
 11. SQL pendiente: 4 políticas RLS nuevas (admin ve clientes/cotizaciones de todos; usuarios legibles por todos los autenticados; admin puede cambiar rol)
+
+### Sesión 4 — Correcciones de robustez y renombrado de rutas
+1. `tarifasDB.obtenerActivas()` — cambiado de `.single()` a `.maybeSingle()` para evitar error 406 cuando hay múltiples filas con `activa = true`
+2. `calculos.js` — añadido `export const TARIFAS_DEFAULT` como única fuente de valores por defecto de tarifas
+3. `useTarifas()` — ya no se queda en `loading: true` si Supabase devuelve `null` o lanza error; cae a `TARIFAS_DEFAULT` en ambos casos
+4. `Solicitar.jsx` — eliminado el objeto `TARIFAS` local duplicado; ahora importa `TARIFAS_DEFAULT` de `calculos.js`
+5. Rutas renombradas: `/solicitar` (formulario público) → `/cotizar`; `/cotizar` y `/cotizar/:id` (cotizador interno) → `/nueva-cotizacion` y `/nueva-cotizacion/:id`
+6. Actualizado `App.jsx`, `Historial.jsx`, `CotizacionDetalle.jsx` y `Cotizador.jsx` con las nuevas rutas
 
 ---
 
