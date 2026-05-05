@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto del Proyecto Gungry
 
-Documento generado el 30 de abril de 2026 para continuar el trabajo de reactivación de la app Gungry.
+Documento generado el 30 de abril de 2026. Última actualización: 5 de mayo de 2026.
 
 ---
 
@@ -88,6 +88,9 @@ Las credenciales reales se encuentran en **Railway → proyecto gungry-backend �
 | `src/app/app.component.ts` | Import de `onesignal-cordova-plugin/types/Notification` comentado, reemplazado con `any` |
 | `src/types.d.ts` | Nuevo — declare module para `NotificationReceivedEvent` y `OpenedEvent` |
 | `src/app/pages/map/map.ts` | `buttonClose` → `bottomClose`, fallback a coordenadas de Guadalajara cuando no hay geolocalización |
+| `src/app/pages/home/home.html` | `disabled="true"` → `readonly="true"` en el `ion-searchbar` de la barra de ubicación — `disabled` bloqueaba los eventos click, `readonly` mantiene el campo no editable pero permite disparar `onPresentLocationSelectModal()` |
+| `src/app/pages/location-select/location-select.html` | Botón `locate-outline` en `slot="end"` del toolbar junto al searchbar — llama a `onUseCurrentLocation()` |
+| `src/app/pages/location-select/location-select.ts` | Método `onUseCurrentLocation()`: usa `navigator.geolocation.getCurrentPosition()` + `google.maps.Geocoder` para reverse geocoding; construye objeto compatible con Google Places details (`formatted_address` + `geometry.location.lat()/lng()`) y cierra el modal con `onDismiss()` |
 
 ---
 
