@@ -151,9 +151,9 @@ Las categorías (`categorias_producto`) son fijas (5 tipos: espejo natural/color
 
 `calcularPartida(form, tarifas, variante = null)` acepta un tercer argumento. Si se pasa variante con `precio_m2`, ese valor sustituye al precio del objeto tarifas. Retrocompatible: todo el código que no pasa variante sigue funcionando con el precio de `tarifas.vidrio[tipo]`.
 
-### Decisión: variante_id no se persiste en la tabla partidas
+### Decisión: variante_id en partidas como FK nullable
 
-La columna `variante_id` no existe en `partidas`. El `precio_unit` calculado con la variante sí se guarda, por lo que el total es correcto. Al cargar una cotización guardada para editarla, el selector de variante aparece sin selección y el recálculo del preview usa la tarifa base (no la variante original). Es una inconsistencia menor aceptada para no modificar el schema en esta iteración.
+`partidas.variante_id uuid REFERENCES variantes_producto(id) ON DELETE SET NULL` (migración 003). Al guardar una cotización se persiste la variante elegida. Al cargar la partida para editar, `form.variante_id` se restaura y `varianteObj` se resuelve desde las categorías cargadas en memoria — el preview recalcula con el precio correcto de la variante.
 
 ### Decisión: MathBreakdown como componente compartido
 
