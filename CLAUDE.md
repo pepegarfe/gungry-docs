@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto completo del proyecto Antike
 
-> **Propósito de este archivo:** Transferencia de contexto para que una IA (u otro desarrollador) pueda continuar el trabajo sin perder ninguna decisión tomada, patrón acordado ni advertencia crítica. Actualizado el 5 de mayo de 2026 (sesión 6).
+> **Propósito de este archivo:** Transferencia de contexto para que una IA (u otro desarrollador) pueda continuar el trabajo sin perder ninguna decisión tomada, patrón acordado ni advertencia crítica. Actualizado el 5 de mayo de 2026 (sesión 7).
 
 ---
 
@@ -90,7 +90,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 | `src/pages/CotizacionDetalle.jsx` | Vista de solo lectura de una cotización guardada. Partidas mostradas en layout de filas (`pd-*`). Admin ve botón "Ver lógica matemática" por partida (usa `MathBreakdown`). |
 | `src/pages/Historial.jsx` | Layout de dos columnas: sidebar oscuro con clientes + timeline de versiones. CRUD completo de clientes. Admin ve todas las cotizaciones de todos los usuarios; cada tarjeta muestra creador y fecha de creación. Vendedor solo ve las suyas. |
 | `src/pages/Tarifas.jsx` | Motor de tarifas editable con 7 pestañas. Solo accesible para admin. Al guardar versiona (no sobreescribe). |
-| `src/pages/Solicitar.jsx` | **Formulario público para clientes externos** (sin autenticación). El cliente ingresa datos de contacto, configura productos y **elige variante de material** desde un grid de tarjetas (imagen 80×80 + nombre + precio/m²). Usa `useCategorias()` + `TIPO_A_NOMBRE` para derivar las variantes activas de la categoría seleccionada. `calcPreview()` pasa `varianteObj` como tercer argumento a `calcularPartida()`. Botón "Agregar producto" bloqueado hasta seleccionar variante si la categoría tiene alguna activa. **No muestra precios al cliente.** Importa `TARIFAS_DEFAULT` y `TIPO_A_NOMBRE` de `calculos.js`. Ruta: `/cotizar`. |
+| `src/pages/Solicitar.jsx` | **Configurador bespoke de 6 pasos para clientes externos** (sin autenticación). Layout de dos columnas: columna izquierda con canvas / imagen de material; columna derecha con resumen acumulativo + paso activo + botones de nav. Los 6 pasos son: (1) Forma y dimensiones, (2) Material, (3) Acabados, (4) Marco, (5) Iluminación, (6) Contacto. Carga categorías con `categoriasDB.listar()` y variantes con `variantesDB.listarPorCategoria()`. Botón "next →" bloqueado en paso 1 sin forma, paso 2 sin variante. Animación fade entre pasos con `@keyframes bespoke-fadein` via `key={paso}`. El canvas muestra la forma + dimensiones; cuando hay variante con imagen se reemplaza por `<div class="bespoke-canvas-img">` con `background-image`. Resumen superior: 6 ítems de íconos SVG inline (forma, dims, material, acabados, marco, led) con estado `.vacio` cuando el campo aún no fue rellenado. Envío: `solicitudesDB.crear()` con campos planos (ver ⚠️ schema pendiente). Ruta: `/cotizar`. |
 | `src/pages/Solicitudes.jsx` | **Vista admin de solicitudes de clientes.** Sidebar con lista + filtros por estado (pendiente/enviada/convertida). Panel de detalle con miniatura canvas por producto y botón "Ver lógica matemática" (usa `MathBreakdown`). Solo accesible para admin. Ruta: `/solicitudes`. |
 | `src/pages/Usuarios.jsx` | **Gestión de usuarios (solo admin).** Formulario para crear nuevas cuentas de vendedor (llama a `api/crear-usuario.js`). Tabla de usuarios existentes con selector de rol. Ruta: `/usuarios`. |
 | `src/pages/Materiales.jsx` | **Gestión de variantes de materiales (solo admin).** Layout dos columnas: sidebar con las 5 categorías fijas + panel con grid de tarjetas de variantes. Cada tarjeta permite editar precio inline, toggle activa/inactiva y eliminar. Formulario inline para crear variante con upload de imagen. Ruta: `/materiales`. |
@@ -101,7 +101,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 |---|---|
 | `src/App.jsx` | Router con React Router 6. Componente `Privado` con guard de auth + guard de rol (`soloAdmin`). Nav lateral: links principales (nueva-cotizacion, historial, solicitudes) + submenú de configuración ⚙ en el footer (Tarifas y Usuarios, solo admin). Rutas lazy con `Suspense`. `/cotizar` es pública (sin `Privado`). Rutas privadas del cotizador: `/nueva-cotizacion` y `/nueva-cotizacion/:id`. Rutas admin-only: `/tarifas`, `/solicitudes`, `/usuarios`. |
 | `src/main.jsx` | Punto de entrada React. Monta `<App />` en `#root`. Importa `global.css`. |
-| `src/styles/global.css` | **Todos los estilos en un solo archivo.** Variables CSS, dark mode, DM Sans + DM Mono. Incluye clases `.sol-*` (formulario público, incl. `.sol-variantes-grid` y `.sol-variante-card/img/placeholder/nombre/precio` para el selector de variantes), `.sq-*` (vista solicitudes admin), `.math-breakdown` / `.mb-*` (desglose matemático), `.pd-*` (cards de partida en filas), `.mat-*` (gestión de materiales), `.usu-*` (gestión de usuarios), `.nav-config-*` (submenú de configuración). Toasts usan `background: #1e1e1c` (hardcoded) para no romper en dark mode. |
+| `src/styles/global.css` | **Todos los estilos en un solo archivo.** Variables CSS, dark mode, DM Sans + DM Mono. Incluye clases `.bespoke-*` (configurador público de 6 pasos: layout, canvas, resumen SVG, pasos, nav, shapes, variantes, toggle LED, contacto, confirmación, responsive mobile), `.sq-*` (vista solicitudes admin), `.math-breakdown` / `.mb-*` (desglose matemático), `.pd-*` (cards de partida en filas), `.mat-*` (gestión de materiales), `.usu-*` (gestión de usuarios), `.nav-config-*` (submenú de configuración). Toasts usan `background: #1e1e1c` (hardcoded) para no romper en dark mode. Las clases `.sol-*` (formulario público antiguo) ya no están en uso desde sesión 7. |
 
 ---
 
@@ -180,6 +180,18 @@ Si los precios base cambian, actualizar **solo** `TARIFAS_DEFAULT` en `calculos.
 ### Decisión: nav de configuración en submenú colapsable
 
 Los links de Tarifas y Usuarios se movieron a un submenú `⚙` que aparece junto al email del usuario en el footer de la nav lateral. Esto despeja la nav principal y agrupa las opciones de configuración en un solo lugar. Solo visible para admin.
+
+### Decisión: configurador bespoke de 6 pasos en Solicitar.jsx
+
+`Solicitar.jsx` fue reescrito completamente como un wizard de 6 pasos de pantalla completa (sesión 7). Decisiones técnicas clave:
+
+- **Layout dos columnas**: `display: grid; grid-template-columns: 60% 40%; height: 100vh; overflow: hidden`. La columna izquierda es el canvas/imagen; la derecha tiene el resumen + paso + nav.
+- **Canvas vs imagen de material**: Si `config.variante_imagen_url` existe, la columna izquierda muestra `<div class="bespoke-canvas-img" style="background-image: url(...)">` en lugar del `<canvas>`. El overlay `<div class="bespoke-canvas-step-name">` funciona sobre ambos modos (el nombre del paso se pintaba antes en el canvas con `fillText`, lo que no funcionaba en modo imagen).
+- **Animación entre pasos**: `<div class="bespoke-paso-contenido" key={paso}>` — el `key` fuerza remontar el div en cada cambio de paso, lo que dispara `@keyframes bespoke-fadein` automáticamente.
+- **Bloq. del botón next**: `nextDeshabilitado = (paso === 1 && !config.forma) || (paso === 2 && !config.variante_id)`.
+- **Resumen con íconos SVG**: El panel superior muestra 6 ítems (`ResumenItem`) con iconos SVG de 14px + texto truncado. La clase `.vacio` (aplicada cuando `valor` es falsy) tiñe todo en `#bbb` con opacidad reducida. Helper `resumenAcabados(procesos)` muestra los nombres si son ≤ 2, o "N acabados" si son más.
+- **Mobile**: Layout de una columna, canvas como header de 240px altura, resumen con acordeón colapsable (`resumenAbierto` state + botón toggle visible solo en mobile), nav fija al fondo con `position: fixed; bottom: 0`.
+- **Un solo producto por solicitud**: A diferencia del formulario anterior (que soportaba múltiples partidas en un array jsonb), el bespoke configurador envía los campos de un solo producto de forma plana.
 
 ### Patrón de hooks
 
@@ -488,6 +500,16 @@ En Windows, pegar SQL con strings JSON multilinea puede insertar caracteres CRLF
 ### 10. `api/crear-usuario.js` — siempre verificar JWT antes de llamar al admin API
 La función verifica que el token Bearer corresponda a un usuario con `rol = 'admin'` en `public.users`. Si se omite esa verificación, cualquiera con un JWT válido podría crear cuentas. No simplificar esta función.
 
+### 12. Schema de `solicitudes` — desincronizado con el nuevo configurador bespoke
+
+El nuevo `Solicitar.jsx` (sesión 7) llama a `solicitudesDB.crear()` con campos planos:
+`forma`, `ancho`, `alto`, `categoria_id`, `variante_id`, `variante_nombre`, `procesos`, `n_barrenos`, `marco`, `marco_acabado`, `led`, `nombre`, `empresa`, `tel`, `email`, `notas`, `estado`.
+
+El schema actual de `solicitudes` tiene `partidas jsonb` y `total numeric`, pero **no tiene estas columnas individuales**. El INSERT fallará en producción hasta que se ejecute una migración. Pendiente crear `003_solicitudes_bespoke.sql` que:
+- Elimine o renombre la columna `partidas jsonb`
+- Elimine la columna `total numeric`
+- Agregue las columnas planas del nuevo formulario
+
 ### 11. Toasts — no usar variables CSS que cambien en dark mode
 El color de fondo del toast usa `background: #1e1e1c` (hardcoded). Si se cambia a `var(--ink)` u otra variable que se invierte en dark mode, el texto y el fondo quedarán del mismo color y el toast será ilegible. Mantener valores hardcoded para elementos que necesiten color fijo.
 
@@ -512,8 +534,8 @@ El color de fondo del toast usa `background: #1e1e1c` (hardcoded). Si se cambia 
 | Submenú de configuración ⚙ en nav lateral | `App.jsx` | ✅ |
 | Categorías y variantes de materiales (DB + admin UI) | `002_variantes_material.sql`, `Materiales.jsx`, `categoriasDB`, `variantesDB` | ✅ |
 | Selector de variante en cotizador interno (chips con imagen, botón bloqueado sin variante) | `Cotizador.jsx`, `useCategorias`, `calcularPartida` | ✅ |
-| Selector de variante en formulario público (grid tarjetas 80×80, botón bloqueado sin variante) | `Solicitar.jsx`, `useCategorias`, `TIPO_A_NOMBRE` | ✅ |
-| Formulario público sin precios estimados | `Solicitar.jsx` | ✅ |
+| Configurador bespoke de 6 pasos (formulario público) | `Solicitar.jsx`, `global.css` (`.bespoke-*`) | ✅ |
+| Resumen acumulativo con íconos SVG (120px) | `Solicitar.jsx` (`ResumenItem`, `IcoForma/Dims/Material/Acabados/Marco/Led`) | ✅ |
 | Vista admin de solicitudes de clientes | `Solicitudes.jsx` | ✅ |
 | Schema de base de datos (incl. tabla solicitudes) | `001_schema_inicial.sql` | ✅ |
 | Cliente Supabase + helpers CRUD completos | `supabase.js` | ✅ |
@@ -534,6 +556,28 @@ CREATE POLICY "admin ve todas las cotizaciones" ON public.cotizaciones FOR SELEC
 CREATE POLICY "authenticated read users" ON public.users FOR SELECT TO authenticated USING (true);
 CREATE POLICY "admin update rol" ON public.users FOR UPDATE TO authenticated
   USING ((SELECT rol FROM public.users WHERE id = auth.uid()) = 'admin');
+```
+
+### ⚠️ Migración pendiente — `003_solicitudes_bespoke.sql`
+
+El nuevo configurador bespoke envía campos planos a `solicitudes`. La tabla actual no los tiene. Crear y ejecutar esta migración antes de usar `/cotizar` en producción:
+
+```sql
+-- Adaptar tabla solicitudes al nuevo configurador bespoke de un solo producto
+ALTER TABLE public.solicitudes
+  DROP COLUMN IF EXISTS partidas,
+  DROP COLUMN IF EXISTS total,
+  ADD COLUMN IF NOT EXISTS forma         text,
+  ADD COLUMN IF NOT EXISTS ancho         numeric,
+  ADD COLUMN IF NOT EXISTS alto          numeric,
+  ADD COLUMN IF NOT EXISTS categoria_id  uuid REFERENCES categorias_producto(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS variante_id   uuid REFERENCES variantes_producto(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS variante_nombre text,
+  ADD COLUMN IF NOT EXISTS procesos      text[],
+  ADD COLUMN IF NOT EXISTS n_barrenos    int,
+  ADD COLUMN IF NOT EXISTS marco         text,
+  ADD COLUMN IF NOT EXISTS marco_acabado text,
+  ADD COLUMN IF NOT EXISTS led           text;
 ```
 
 ### 🔜 Pendiente
@@ -675,6 +719,23 @@ reportlab  (pip install reportlab --break-system-packages)
 2. `Cotizador.jsx` — botón "Agregar partida" bloqueado cuando la categoría tiene variantes activas y ninguna está seleccionada; nombre de variante visible en `FilaPartida` (columna descripción, junto al tipo y espesor)
 3. `Solicitar.jsx` — integración completa de variantes: `useCategorias()` + `TIPO_A_NOMBRE` para derivar variantes sin queries adicionales; grid de tarjetas 3 columnas (imagen 80×80 con `object-fit:cover` o placeholder con inicial, nombre, precio/m²); `calcPreview()` pasa `varianteObj` a `calcularPartida()`; reset de variante al cambiar tipo; botón "Agregar producto" bloqueado sin variante seleccionada; `variante_id`/`variante_nombre` guardados en cada partida de la solicitud
 4. `global.css` — 10 clases nuevas `.sol-variante-*` y `.sol-variantes-grid` para el selector de variantes del formulario público
+
+### Sesión 7 — Configurador bespoke de 6 pasos en Solicitar.jsx
+1. `Solicitar.jsx` — reescritura completa como wizard de pantalla completa con layout de dos columnas (60% canvas / 40% config), `height: 100vh`, sin barra de navegación lateral (ruta pública `/cotizar`)
+2. Paso 1: grid de 4 formas con íconos SVG (`FORMAS` array) + canvas `drawPreview()` con shape + dimensiones en tiempo real
+3. Paso 2: tabs de categorías + lista de variantes como filas seleccionables con círculo de imagen/inicial; `seleccionarCategoria()` carga variantes via `variantesDB.listarPorCategoria()`
+4. Paso 3: lista de acabados multiselección; si "barrenos" activo, muestra input de cantidad
+5. Paso 4: selector de marco + selector de acabado de marco (electrostático deshabilitado para latón)
+6. Paso 5: toggle LED on/off + selector de tipo LED con descripción
+7. Paso 6: formulario de contacto (nombre, empresa, tel*, email*) + validación + `solicitudesDB.crear()` + pantalla de confirmación `<Confirmacion />`
+8. Canvas/imagen toggle: cuando `config.variante_imagen_url` existe, columna izquierda muestra `<div class="bespoke-canvas-img">` con `background-image`; overlay `<div class="bespoke-canvas-step-name">` funciona en ambos modos
+9. Animación fade: `key={paso}` en el div de contenido del paso dispara `@keyframes bespoke-fadein` en cada cambio
+10. Botón "next →" deshabilitado: paso 1 sin forma, paso 2 sin variante seleccionada
+11. Barra de progreso: 6 segmentos, los anteriores al paso actual se marcan con clase `.done`
+12. Resumen acumulativo: panel de 120px con 6 ítems de ícono SVG + texto truncado; clase `.vacio` cuando campo no rellenado; helper `resumenAcabados()` formatea procesos (≤2 nombres, 3+ como "N acabados"); componente `ResumenItem` con 6 SVGs: `IcoForma`, `IcoDims`, `IcoMaterial`, `IcoAcabados`, `IcoMarco`, `IcoLed`
+13. Mobile responsive: una columna, canvas header 240px, resumen colapsable con botón toggle, nav fija `position: fixed; bottom: 0`, `padding-bottom: 100px` en `.bespoke-paso` para no quedar bajo la nav
+14. `global.css` — añadidas todas las clases `.bespoke-*` (~140 líneas); eliminadas `.bespoke-resumen-fila/label/valor`; añadidas `.bespoke-resumen-item`, `.vacio`, `.bespoke-resumen-truncar`
+15. ⚠️ Schema de `solicitudes` desincronizado: el nuevo form envía campos planos; requiere migración `003_solicitudes_bespoke.sql` (ver sección SQL pendiente)
 
 ### Sesión 4 — Correcciones de robustez y renombrado de rutas
 1. `tarifasDB.obtenerActivas()` — cambiado de `.single()` a `.maybeSingle()` para evitar error 406 cuando hay múltiples filas con `activa = true`
