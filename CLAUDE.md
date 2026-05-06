@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto completo del proyecto Antike
 
-> **Propósito de este archivo:** Transferencia de contexto para que una IA (u otro desarrollador) pueda continuar el trabajo sin perder ninguna decisión tomada, patrón acordado ni advertencia crítica. Actualizado el 5 de mayo de 2026.
+> **Propósito de este archivo:** Transferencia de contexto para que una IA (u otro desarrollador) pueda continuar el trabajo sin perder ninguna decisión tomada, patrón acordado ni advertencia crítica. Actualizado el 5 de mayo de 2026 (sesión 6).
 
 ---
 
@@ -67,7 +67,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 | Archivo | Propósito |
 |---|---|
 | `src/lib/supabase.js` | **Archivo más crítico del frontend.** Cliente Supabase único + todos los helpers de DB por dominio: `auth`, `clientesDB`, `cotizacionesDB`, `partidasDB`, `tarifasDB`, `pdfDB`, `solicitudesDB`, `usuariosDB`, `categoriasDB`, `variantesDB`. Toda operación de DB pasa por aquí. `clientesDB.listar()` y `cotizacionesDB.listar()` enriquecen cada registro con el campo `creador` (nombre + email del usuario que lo creó), usando una segunda query a `public.users`. |
-| `src/lib/calculos.js` | Motor de cálculo central. Funciones: `calcArea()`, `calcPerimetro()`, `calcPeso()`, `calcularPartida()`, `validarPartida()`, `dibujarMiniatura()`, `calcularRejas()`. También exporta `TARIFAS_DEFAULT` — el objeto de tarifas canónico usado como fallback en `useTarifas()` y en `Solicitar.jsx`. **Este módulo es la única fuente de verdad para precios** — lo usan tanto el frontend como `api/pdf.py`. |
+| `src/lib/calculos.js` | Motor de cálculo central. Funciones: `calcArea()`, `calcPerimetro()`, `calcPeso()`, `calcularPartida()`, `validarPartida()`, `dibujarMiniatura()`, `calcularRejas()`. Exporta `TARIFAS_DEFAULT` (fallback de tarifas) y `TIPO_A_NOMBRE` (mapeo de tipo string → nombre de categoría en DB, ej. `'espejo_natural' → 'Espejo natural'`). **Este módulo es la única fuente de verdad para precios** — lo usan tanto el frontend como `api/pdf.py`. |
 
 ### `src/hooks/`
 
@@ -90,7 +90,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 | `src/pages/CotizacionDetalle.jsx` | Vista de solo lectura de una cotización guardada. Partidas mostradas en layout de filas (`pd-*`). Admin ve botón "Ver lógica matemática" por partida (usa `MathBreakdown`). |
 | `src/pages/Historial.jsx` | Layout de dos columnas: sidebar oscuro con clientes + timeline de versiones. CRUD completo de clientes. Admin ve todas las cotizaciones de todos los usuarios; cada tarjeta muestra creador y fecha de creación. Vendedor solo ve las suyas. |
 | `src/pages/Tarifas.jsx` | Motor de tarifas editable con 7 pestañas. Solo accesible para admin. Al guardar versiona (no sobreescribe). |
-| `src/pages/Solicitar.jsx` | **Formulario público para clientes externos** (sin autenticación). El cliente ingresa datos de contacto y configura sus productos. **No muestra precios** — los precios solo llegan cuando el admin manda la cotización. Importa `TARIFAS_DEFAULT` de `calculos.js` para calcular el total al guardar en `solicitudes`. Ruta: `/cotizar`. |
+| `src/pages/Solicitar.jsx` | **Formulario público para clientes externos** (sin autenticación). El cliente ingresa datos de contacto, configura productos y **elige variante de material** desde un grid de tarjetas (imagen 80×80 + nombre + precio/m²). Usa `useCategorias()` + `TIPO_A_NOMBRE` para derivar las variantes activas de la categoría seleccionada. `calcPreview()` pasa `varianteObj` como tercer argumento a `calcularPartida()`. Botón "Agregar producto" bloqueado hasta seleccionar variante si la categoría tiene alguna activa. **No muestra precios al cliente.** Importa `TARIFAS_DEFAULT` y `TIPO_A_NOMBRE` de `calculos.js`. Ruta: `/cotizar`. |
 | `src/pages/Solicitudes.jsx` | **Vista admin de solicitudes de clientes.** Sidebar con lista + filtros por estado (pendiente/enviada/convertida). Panel de detalle con miniatura canvas por producto y botón "Ver lógica matemática" (usa `MathBreakdown`). Solo accesible para admin. Ruta: `/solicitudes`. |
 | `src/pages/Usuarios.jsx` | **Gestión de usuarios (solo admin).** Formulario para crear nuevas cuentas de vendedor (llama a `api/crear-usuario.js`). Tabla de usuarios existentes con selector de rol. Ruta: `/usuarios`. |
 | `src/pages/Materiales.jsx` | **Gestión de variantes de materiales (solo admin).** Layout dos columnas: sidebar con las 5 categorías fijas + panel con grid de tarjetas de variantes. Cada tarjeta permite editar precio inline, toggle activa/inactiva y eliminar. Formulario inline para crear variante con upload de imagen. Ruta: `/materiales`. |
@@ -101,7 +101,7 @@ UPDATE public.users SET rol = 'admin' WHERE email = 'correo@ejemplo.com';
 |---|---|
 | `src/App.jsx` | Router con React Router 6. Componente `Privado` con guard de auth + guard de rol (`soloAdmin`). Nav lateral: links principales (nueva-cotizacion, historial, solicitudes) + submenú de configuración ⚙ en el footer (Tarifas y Usuarios, solo admin). Rutas lazy con `Suspense`. `/cotizar` es pública (sin `Privado`). Rutas privadas del cotizador: `/nueva-cotizacion` y `/nueva-cotizacion/:id`. Rutas admin-only: `/tarifas`, `/solicitudes`, `/usuarios`. |
 | `src/main.jsx` | Punto de entrada React. Monta `<App />` en `#root`. Importa `global.css`. |
-| `src/styles/global.css` | **Todos los estilos en un solo archivo.** Variables CSS, dark mode, DM Sans + DM Mono. Incluye clases `.sol-*` (formulario público), `.sq-*` (vista solicitudes admin), `.math-breakdown` / `.mb-*` (desglose matemático), `.pd-*` (cards de partida en filas), `.usu-*` (gestión de usuarios), `.nav-config-*` (submenú de configuración). Toasts usan `background: #1e1e1c` (hardcoded) para no romper en dark mode. |
+| `src/styles/global.css` | **Todos los estilos en un solo archivo.** Variables CSS, dark mode, DM Sans + DM Mono. Incluye clases `.sol-*` (formulario público, incl. `.sol-variantes-grid` y `.sol-variante-card/img/placeholder/nombre/precio` para el selector de variantes), `.sq-*` (vista solicitudes admin), `.math-breakdown` / `.mb-*` (desglose matemático), `.pd-*` (cards de partida en filas), `.mat-*` (gestión de materiales), `.usu-*` (gestión de usuarios), `.nav-config-*` (submenú de configuración). Toasts usan `background: #1e1e1c` (hardcoded) para no romper en dark mode. |
 
 ---
 
@@ -145,7 +145,9 @@ El folio (`COT-2025-XXXX`) lo genera la función PostgreSQL `siguiente_folio(use
 
 ### Decisión: sistema de categorías y variantes de materiales
 
-Las categorías (`categorias_producto`) son fijas (5 tipos: espejo natural/color/avejentado, vidrio flotado/texturizado). Las variantes (`variantes_producto`) son administrables por el admin desde `/materiales`. `categoriasDB.listar()` devuelve categorías con variantes embebidas (`select('*, variantes_producto(*)')`). En el cotizador, `useCategorias()` carga todo de una vez y `FormPartida` extrae las variantes de la categoría activa sin llamadas adicionales. `variantesDB.listarPorCategoria()` filtra por `activa = true` (para el cotizador público), mientras que `Materiales.jsx` consulta directo a Supabase sin filtro para ver también las inactivas.
+Las categorías (`categorias_producto`) son fijas (5 tipos: espejo natural/color/avejentado, vidrio flotado/texturizado). Las variantes (`variantes_producto`) son administrables por el admin desde `/materiales`. `categoriasDB.listar()` devuelve categorías con variantes embebidas (`select('*, variantes_producto(*)')`). Su RLS permite lectura anónima, por lo que funciona tanto en páginas autenticadas como en la página pública `/cotizar`.
+
+Tanto `Cotizador.jsx` como `Solicitar.jsx` usan `useCategorias()` para cargar categorías + variantes en un solo request. El mapeo de tipo string a nombre de categoría se hace con `TIPO_A_NOMBRE` (exportado de `calculos.js`). Las variantes activas se derivan en render sin llamadas adicionales: `categorias.find(c => c.nombre === TIPO_A_NOMBRE[form.tipo])?.variantes_producto.filter(v => v.activa)`. `Materiales.jsx` consulta directo a Supabase sin filtro `activa` para ver también las inactivas.
 
 ### Decisión: variante en calcularPartida como tercer parámetro opcional
 
@@ -509,7 +511,8 @@ El color de fondo del toast usa `background: #1e1e1c` (hardcoded). Si se cambia 
 | Gestión de usuarios y creación de cuentas (admin) | `Usuarios.jsx`, `api/crear-usuario.js`, `usuariosDB` | ✅ |
 | Submenú de configuración ⚙ en nav lateral | `App.jsx` | ✅ |
 | Categorías y variantes de materiales (DB + admin UI) | `002_variantes_material.sql`, `Materiales.jsx`, `categoriasDB`, `variantesDB` | ✅ |
-| Selector de variante en cotizador (chips con imagen) | `Cotizador.jsx`, `useCategorias`, `calcularPartida` | ✅ |
+| Selector de variante en cotizador interno (chips con imagen, botón bloqueado sin variante) | `Cotizador.jsx`, `useCategorias`, `calcularPartida` | ✅ |
+| Selector de variante en formulario público (grid tarjetas 80×80, botón bloqueado sin variante) | `Solicitar.jsx`, `useCategorias`, `TIPO_A_NOMBRE` | ✅ |
 | Formulario público sin precios estimados | `Solicitar.jsx` | ✅ |
 | Vista admin de solicitudes de clientes | `Solicitudes.jsx` | ✅ |
 | Schema de base de datos (incl. tabla solicitudes) | `001_schema_inicial.sql` | ✅ |
@@ -666,6 +669,12 @@ reportlab  (pip install reportlab --break-system-packages)
 6. `Cotizador.jsx` — `FormPartida` recibe `categorias` como prop; muestra chips de variante después del selector de tipo; al cambiar tipo se resetea la variante; variante seleccionada se pasa a `calcularPartida` como tercer argumento
 7. `App.jsx` — ruta `/materiales` (admin-only) + link "Materiales" en submenú ⚙
 8. `global.css` — añadidas clases `.mat-*` (layout, sidebar, panel, grid de tarjetas, form nueva variante, chip con imagen)
+
+### Sesión 6 — Variantes conectadas al cotizador interno y formulario público
+1. `calculos.js` — exportado `TIPO_A_NOMBRE` (mapeo tipo string → nombre de categoría, reutilizable por cualquier página)
+2. `Cotizador.jsx` — botón "Agregar partida" bloqueado cuando la categoría tiene variantes activas y ninguna está seleccionada; nombre de variante visible en `FilaPartida` (columna descripción, junto al tipo y espesor)
+3. `Solicitar.jsx` — integración completa de variantes: `useCategorias()` + `TIPO_A_NOMBRE` para derivar variantes sin queries adicionales; grid de tarjetas 3 columnas (imagen 80×80 con `object-fit:cover` o placeholder con inicial, nombre, precio/m²); `calcPreview()` pasa `varianteObj` a `calcularPartida()`; reset de variante al cambiar tipo; botón "Agregar producto" bloqueado sin variante seleccionada; `variante_id`/`variante_nombre` guardados en cada partida de la solicitud
+4. `global.css` — 10 clases nuevas `.sol-variante-*` y `.sol-variantes-grid` para el selector de variantes del formulario público
 
 ### Sesión 4 — Correcciones de robustez y renombrado de rutas
 1. `tarifasDB.obtenerActivas()` — cambiado de `.single()` a `.maybeSingle()` para evitar error 406 cuando hay múltiples filas con `activa = true`
