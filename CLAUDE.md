@@ -745,6 +745,15 @@ reportlab  (pip install reportlab --break-system-packages)
 5. Rutas renombradas: `/solicitar` (formulario público) → `/cotizar`; `/cotizar` y `/cotizar/:id` (cotizador interno) → `/nueva-cotizacion` y `/nueva-cotizacion/:id`
 6. Actualizado `App.jsx`, `Historial.jsx`, `CotizacionDetalle.jsx` y `Cotizador.jsx` con las nuevas rutas
 
+### Sesión 8 — renderEspejo, imagenActiva y sincronización del cotizador interno
+1. `src/lib/renderEspejo.js` — nuevo archivo con función `renderEspejo(canvas, opciones)`: render fotorrealista con sombra, marco metálico por silueta (stroke + gradiente), bisel/chaflán, superficie especular con reflexiones y glow LED exterior al marco
+2. `Solicitar.jsx` — estado `imagenActiva` (URL de la última opción con imagen seleccionada); helper `actualizarImagenSiExiste`; columna izquierda alterna entre foto (65% centrada) y canvas render; botón "⟲ Ver render" para volver al render; `renderEspejo` conectado al canvas via `setCanvasSize` (getBoundingClientRect) + retry loop de hasta 20 intentos; `configRef` para evitar stale closures; `useCallback` para `setCanvasSize`
+3. `Solicitar.jsx` pasos con imagen: Paso 2 (variante), Paso 3 (borde, extras), Paso 4 (acabado/color marco), Paso 5 (LED tipo, touch, antifog) — todos llaman `actualizarImagenSiExiste` al seleccionar
+4. `renderEspejo.js` — marco metálico usa `stroke + trazarFigura` en lugar de `fillRect` para seguir la silueta en figuras no rectangulares; LED glow sale desde el exterior del marco (`ox/oy/pw/ph`) cuando hay marco
+5. `Cotizador.jsx` — figura 'arco' agregada al selector; canvas de preview de `FormPartida` migrado a `renderEspejo` (200×160, fondo oscuro); `dibujarMiniatura` eliminado de `FormPartida` (se mantiene en `TablaPartidas` para miniaturas pequeñas)
+6. `calculos.js` — `calcArea()` trata `'arco'` igual que `'irreg'` (bounding box + bbox_mm)
+7. `global.css` — `.bespoke-ver-render-btn` y hover; `.bespoke-canvas-col` con `height: 100vh; overflow: hidden`
+
 ---
 
 *Para continuar el trabajo, leer este archivo completo antes de hacer cualquier cambio al código.*
