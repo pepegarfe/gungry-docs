@@ -102,15 +102,28 @@ partidas       (id, cotizacion_id, user_id, orden, descripcion, tipo, espesor,
                 marco, marco_acabado, led, variante_id uuid FK nullable,
                 area_unit, peso_unit, perimetro, c_vidrio, c_marco, c_led, c_fijo,
                 costo_unit, precio_unit, precio_total)
-tarifas        (id, user_id, version int, activa bool, datos jsonb, notas)
+tarifas        (id, user_id, version int, activa bool, es_global bool, datos jsonb, notas)
 solicitudes    (id, nombre, empresa, email, tel, estado DEFAULT 'pendiente', created_at
                 + columnas planas del bespoke — ver migración pendiente abajo)
-categorias_producto  (id, nombre, orden)
+categorias_producto  (id, nombre, orden, activa bool)
 variantes_producto   (id, categoria_id, nombre, precio_m2, imagen_url, activa)
 pdf_exports    (id, cotizacion_id, user_id, storage_path, url_firmada)
 ```
 
-Trigger `handle_new_user` crea fila en `public.users` + fila en `tarifas` al registrarse. Usar `jsonb_build_object()` para el JSON — nunca strings literales (CRLF en Windows rompe el JSON).
+Trigger `handle_new_user` crea fila en `public.users` al registrarse (ya **NO** crea tarifas — existe una sola tarifa global). Usar `jsonb_build_object()` para el JSON — nunca strings literales (CRLF en Windows rompe el JSON).
+
+---
+
+## Tarifas globales — advertencia importante
+
+La tabla `tarifas` tiene **una sola fila activa global** (`es_global = true`). Las reglas clave:
+
+- `tarifasDB.obtenerActivas()` filtra por `activa = true AND es_global = true` — sin `user_id`.
+- `tarifasDB.historial()` filtra por `es_global = true`.
+- La RPC `guardar_tarifas` desactiva la fila global anterior e inserta una nueva con `es_global = true`.
+- RLS: todos los `authenticated` pueden leer la tarifa global; solo `admin` puede escribir.
+- El trigger `handle_new_user` ya **no** crea tarifas al registrar un usuario nuevo.
+- Si se ejecuta una versión antigua del trigger (que creaba tarifas por usuario), se rompe el índice único `tarifas_global_activa_unique`. Verificar siempre que el trigger esté actualizado tras cualquier migración.
 
 ---
 
@@ -146,6 +159,26 @@ ALTER TABLE public.solicitudes
   ADD COLUMN IF NOT EXISTS marco_acabado  text,
   ADD COLUMN IF NOT EXISTS led            text;
 ```
+
+---
+
+## Historial de cambios relevantes
+
+### Sesión actual — Tarifas globales compartidas
+- Tarifas migradas de por-usuario a globales (`es_global = true`)
+- Una sola fila activa para toda la empresa (índice único `tarifas_global_activa_unique`)
+- Todos los usuarios autenticados leen la misma tarifa
+- Solo admins pueden modificar tarifas
+- RLS actualizada: lectura global para `authenticated`, escritura solo para `admin`
+- Trigger `handle_new_user` ya no crea tarifas por usuario nuevo
+- `tarifasDB.obtenerActivas()` y `historial()` actualizados para filtrar por `es_global`
+
+### Sesión anterior — Renombrar vidrio_flotado → espejo_flotado
+- `TARIFAS_DEFAULT.vidrio`: `vidrio_flotado` → `espejo_flotado`
+- `calcularPartida()`: agrega `cFlotado` automático cuando no hay marco (×`mult.vidrio`)
+- `Cotizador.jsx`, `Solicitar.jsx`, `CotizacionDetalle.jsx`, `Tarifas.jsx`: eliminadas referencias a `vidrio_flotado`
+- Columnas `es_flotado` / `c_flotado` agregadas a `partidas` y `solicitudes`
+- Categoría "Vidrio flotado" desactivada en DB
 
 ---
 
